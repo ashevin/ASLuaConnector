@@ -52,15 +52,10 @@ static int cFunctionBridge(lua_State *state)
     for ( int i = -top; i <= -1; i++ )
     {
       id obj = [con performSelector:@selector(createObjectiveCTypeForIndexNumber:) withObject:[NSNumber numberWithInt:i]];
-      
-      
       [args addObject:obj];
     }
     
     con.args = args;
-    
-    args = nil;
-    closures = nil;
     
     return commonBridgeHandler(function(con), con);
   }
@@ -149,8 +144,7 @@ static int objcFunctionBridge(lua_State *state)
 #endif
 }
 
-#pragma mark -
-#pragma mark API
+#pragma mark - API
 
 - (void) setVariableWithName:(NSString *)name andValue:(id)value
 {
@@ -355,8 +349,7 @@ static int objcFunctionBridge(lua_State *state)
 #endif
 }
 
-#pragma mark -
-#pragma mark Private Methods
+#pragma mark - Private Methods
 
 - (void) pushClosures:(NSArray *)closures
 {
@@ -416,7 +409,7 @@ static int objcFunctionBridge(lua_State *state)
       ret = (__bridge id)lua_touserdata(state, index);
       break;
       
-    default:  /* other values */
+    default:  // Other types are not supported.
       ret = nil;
       break;
   }
@@ -451,7 +444,7 @@ static int objcFunctionBridge(lua_State *state)
   {
     lua_pushinteger(state, i + 1);  // Lua convention is for arrays to begin with an index of 1.
 
-    [self pushLuaValueForObject:[array objectAtIndex:i]];
+    [self pushLuaValueForObject:array[i]];
 
     lua_settable(state, top);
   }
@@ -465,7 +458,7 @@ static int objcFunctionBridge(lua_State *state)
   
   while ( lua_next(state, index) != 0 )
   {
-    [dict setObject:[self createObjectiveCTypeForIndex:lua_absindex(state, -1)] forKey:[self createObjectiveCTypeForIndex:lua_absindex(state, -2)]];
+    dict[[self createObjectiveCTypeForIndex:lua_absindex(state, -2)]] = [self createObjectiveCTypeForIndex:lua_absindex(state, -1)];
     
     lua_pop(state, 1);
   }
@@ -481,7 +474,7 @@ static int objcFunctionBridge(lua_State *state)
   
   for ( int i = 0; i < keys.count; i++ )
   {
-    id val = [keys objectAtIndex:i];
+    id val = keys[i];
     
     if ( ! [val isKindOfClass:NSNumber.class] )
       return nil;
@@ -502,7 +495,7 @@ static int objcFunctionBridge(lua_State *state)
   
   NSMutableArray *array = [NSMutableArray arrayWithCapacity:keys.count];
   
-  for ( NSNumber *n in [keys  sortedArrayUsingComparator:^(id obj1, id obj2){ return [(NSNumber *)obj1 compare:(NSNumber *)obj2]; } ])
+  for ( NSNumber *n in [keys sortedArrayUsingComparator:^(id obj1, id obj2){ return [(NSNumber *)obj1 compare:(NSNumber *)obj2]; } ])
     [array addObject:[dict objectForKey:n]];
   
   return array;
