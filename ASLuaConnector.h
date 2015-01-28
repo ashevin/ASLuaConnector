@@ -17,8 +17,8 @@
 
 @class ASLuaConnector;
 
-typedef NSArray* (*ASLuaConnector_CFunction) (ASLuaConnector *luaConnector);
-typedef NSArray* (*ASLuaConnector_ObjCFunction) (id self, SEL _cmd, ASLuaConnector *luaConnector);
+typedef NSArray* (*ASLuaConnector_CFunction)(ASLuaConnector *luaConnector);
+typedef NSArray* (*ASLuaConnector_ObjCFunction)(id self, SEL _cmd, ASLuaConnector *luaConnector);
 
 
 @interface ASLuaConnector : NSObject

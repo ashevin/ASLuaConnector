@@ -17,15 +17,32 @@
   #define __strong
 #endif
 
-static const int PRIVATE_CLOSURES_C = 3;
-static const int PRIVATE_CLOSURES_OBJC = 5;
+static const NSInteger PRIVATE_CLOSURES_C = 3;
+static const NSInteger PRIVATE_CLOSURES_OBJC = 5;
+
+#pragma mark - Private Interface
+
+@interface ASLuaConnector()
+
+- (void) pushClosures:(NSArray *)closures;
+- (void) pushLuaValueForObject:(id)object;
+- (id) createObjectiveCTypeForIndexNumber:(NSNumber *)index;
+- (id) createObjectiveCTypeForIndex:(int)index;
+- (void) createTableFromDictionary:(NSDictionary *)dict;
+- (void) createTableFromArray:(NSArray *)array;
+- (NSDictionary *) createDictionaryFromTableAtIndex:(int)index;
+- (NSArray *)coerceDictionaryToArray:(NSDictionary *)dict;
+
+@end
+
+#pragma mark - Helper functions
 
 static int commonBridgeHandler(NSArray *results, ASLuaConnector *connector)
 {
   for ( id res in results )
-    [connector performSelector:@selector(pushLuaValueForObject:) withObject:res];
-  
-  return results.count;
+    [connector pushLuaValueForObject:res];
+
+  return (int)results.count;
 }
 
 static int cFunctionBridge(lua_State *state)
@@ -34,13 +51,13 @@ static int cFunctionBridge(lua_State *state)
   {
     ASLuaConnector *con = (__bridge ASLuaConnector*)lua_touserdata(state, lua_upvalueindex(1));
     ASLuaConnector_CFunction function = (ASLuaConnector_CFunction)lua_touserdata(state, lua_upvalueindex(2));
-    int closureCount = lua_tointeger(state, lua_upvalueindex(3));
+    NSInteger closureCount = lua_tointeger(state, lua_upvalueindex(3));
     
     NSMutableArray *closures = ( closureCount > 0 ) ? [NSMutableArray arrayWithCapacity:closureCount] : nil;
     
     for ( int i = 1; i <= closureCount; i++ )
     {
-      id obj = [con performSelector:@selector(createObjectiveCTypeForIndexNumber:) withObject:[NSNumber numberWithInt:lua_upvalueindex(PRIVATE_CLOSURES_C + i)]];
+      id obj = [con createObjectiveCTypeForIndexNumber:@(lua_upvalueindex(PRIVATE_CLOSURES_C + i))];
       [closures addObject:obj];
     }
 
@@ -51,7 +68,7 @@ static int cFunctionBridge(lua_State *state)
     
     for ( int i = -top; i <= -1; i++ )
     {
-      id obj = [con performSelector:@selector(createObjectiveCTypeForIndexNumber:) withObject:[NSNumber numberWithInt:i]];
+      id obj = [con createObjectiveCTypeForIndexNumber:@(i)];
       [args addObject:obj];
     }
     
@@ -67,7 +84,7 @@ static int objcFunctionBridge(lua_State *state)
   {
     ASLuaConnector *con = (__bridge ASLuaConnector*)lua_touserdata(state, lua_upvalueindex(1));
     ASLuaConnector_ObjCFunction function = (ASLuaConnector_ObjCFunction)lua_touserdata(state, lua_upvalueindex(2));
-    int closureCount = lua_tointeger(state, lua_upvalueindex(3));
+    NSInteger closureCount = lua_tointeger(state, lua_upvalueindex(3));
     id instance = (__bridge id)lua_touserdata(state, lua_upvalueindex(4));
     const char *_cmd = lua_tostring(state, lua_upvalueindex(5));
     
@@ -95,21 +112,6 @@ static int objcFunctionBridge(lua_State *state)
     return commonBridgeHandler(function(instance, sel_registerName(_cmd), con), con);
   }
 }
-
-#pragma mark - Private Interface
-
-@interface ASLuaConnector()
-
-- (void) pushClosures:(NSArray *)closures;
-- (void) pushLuaValueForObject:(id)object;
-- (id) createObjectiveCTypeForIndexNumber:(NSNumber *)index;
-- (id) createObjectiveCTypeForIndex:(NSInteger)index;
-- (void) createTableFromDictionary:(NSDictionary *)dict;
-- (void) createTableFromArray:(NSArray *)array;
-- (NSDictionary *) createDictionaryFromTableAtIndex:(int)index;
-- (NSArray *)coerceDictionaryToArray:(NSDictionary *)dict;
-
-@end
 
 #pragma mark -
 
@@ -256,8 +258,8 @@ static int objcFunctionBridge(lua_State *state)
       lua_pushlightuserdata(state, (__bridge void*)arg);
   }
 
-  int res;
-  BOOL ret = ( ( res = lua_pcall(state, args.count, LUA_MULTRET, 0) ) == LUA_OK );
+  int res = lua_pcall(state, (int)args.count, LUA_MULTRET, 0);
+  BOOL ret = ( ( res   ) == LUA_OK );
   
   if ( res == LUA_OK )
   {
@@ -312,7 +314,7 @@ static int objcFunctionBridge(lua_State *state)
   
   [self pushClosures:closures];
   
-  lua_pushcclosure(state, cFunctionBridge, closures.count + PRIVATE_CLOSURES_C);
+  lua_pushcclosure(state, cFunctionBridge, (int)closures.count + PRIVATE_CLOSURES_C);
   lua_setglobal(state, [name UTF8String]);
 
 #ifdef ASLUACONNECTOR_STACK_DEBUG
@@ -341,7 +343,7 @@ static int objcFunctionBridge(lua_State *state)
   
   [self pushClosures:closures];
   
-  lua_pushcclosure(state, objcFunctionBridge, closures.count + PRIVATE_CLOSURES_OBJC);
+  lua_pushcclosure(state, objcFunctionBridge, (int)closures.count + PRIVATE_CLOSURES_OBJC);
   lua_setglobal(state, [name UTF8String]);
 
 #ifdef ASLUACONNECTOR_STACK_DEBUG
@@ -381,7 +383,7 @@ static int objcFunctionBridge(lua_State *state)
   return [self createObjectiveCTypeForIndex:[index intValue]];
 }
 
-- (id) createObjectiveCTypeForIndex:(NSInteger)index
+- (id) createObjectiveCTypeForIndex:(int)index
 {
   int t = lua_type(state, index);
 
@@ -419,7 +421,7 @@ static int objcFunctionBridge(lua_State *state)
 
 - (void) createTableFromDictionary:(NSDictionary *)dict
 {
-  lua_createtable(state, 0, dict.count);
+  lua_createtable(state, 0, (int)dict.count);
   int top = lua_gettop(state);
 
   NSEnumerator *keys = [dict keyEnumerator];
@@ -437,7 +439,7 @@ static int objcFunctionBridge(lua_State *state)
 
 - (void) createTableFromArray:(NSArray *)array
 {
-  lua_createtable(state, 0, array.count);
+  lua_createtable(state, 0, (int)array.count);
   int top = lua_gettop(state);
 
   for ( int i = 0; i < array.count; i++ )
